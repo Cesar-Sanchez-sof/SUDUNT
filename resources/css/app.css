@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  
+  /* Colores de marca personalizados para SUDUNT (basados en azul institucional UNT y acentos dorados) */
+  --color-brand-blue-light: #2563eb;
+  --color-brand-blue-dark: #1e3a8a;
+  --color-brand-gold: #d97706;
+}
+
+body {
+  font-family: var(--font-sans);
+}
