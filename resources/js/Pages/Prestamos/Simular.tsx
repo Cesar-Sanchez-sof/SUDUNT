@@ -118,6 +118,22 @@ export default function Simular({ socio, resultado, sociosList, filters }: Props
         }));
     }, [selectedSocioCode, monto, tasa, cuotas, fecha]);
 
+    // Recargar la página al seleccionar socio
+    const handleSocioChange = (code: string) => {
+        setSelectedSocioCode(code);
+        router.get(
+            route('prestamos.simular'),
+            {
+                de_codigo: code,
+                monto,
+                tasa,
+                cuotas,
+                fecha,
+            },
+            { preserveState: true, replace: true }
+        );
+    };
+
     // Recargar la simulación al cambiar parámetros
     const triggerSimulation = () => {
         router.get(
@@ -188,7 +204,7 @@ export default function Simular({ socio, resultado, sociosList, filters }: Props
                                                 setSearchQuery(e.target.value);
                                                 setIsDropdownOpen(true);
                                                 if (e.target.value === '') {
-                                                    setSelectedSocioCode('');
+                                                    handleSocioChange('');
                                                 }
                                             }}
                                             onFocus={(e) => {
@@ -219,7 +235,7 @@ export default function Simular({ socio, resultado, sociosList, filters }: Props
                                                              type="button"
                                                              className="block w-full text-left px-4 py-2 text-sm text-gray-900 hover:bg-blue-100 hover:text-blue-900 dark:text-white dark:hover:bg-blue-600 border-b border-gray-100 dark:border-gray-600 last:border-0"
                                                              onClick={() => {
-                                                                 setSelectedSocioCode(s.de_codigo);
+                                                                 handleSocioChange(s.de_codigo);
                                                                  setSearchQuery(`${s.nombre} (${s.de_codigo})`);
                                                                  setIsDropdownOpen(false);
                                                              }}
