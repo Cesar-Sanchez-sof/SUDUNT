@@ -197,7 +197,8 @@ export default function Caja({ socio, cuotasPendientes, sociosList, filters }: P
                                                     key={s.de_codigo}
                                                     type="button"
                                                     className="block w-full text-left px-4 py-2 text-sm text-gray-900 hover:bg-blue-100 hover:text-blue-900 dark:text-white dark:hover:bg-blue-600 border-b border-gray-100 dark:border-gray-600 last:border-0"
-                                                    onClick={() => {
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault(); // Prevents input from losing focus and triggering onBlur race condition
                                                         handleSocioChange(s.de_codigo);
                                                         setSearchQuery(`${s.nombre} (${s.de_codigo})`);
                                                         setIsDropdownOpen(false);
