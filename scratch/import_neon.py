@@ -9,10 +9,45 @@ print("==================================================")
 print("NEON DATABASE IMPORT TOOL FOR SUDUNT")
 print("==================================================")
 
-host = input("Enter Neon Host (e.g., ep-xxxx-xxxx.us-east-2.aws.neon.tech): ").strip()
-database = input("Enter Neon Database Name (default: neondb): ").strip() or "neondb"
-user = input("Enter Neon Username (default: neondb_owner): ").strip() or "neondb_owner"
-password = input("Enter Neon Password: ").strip()
+raw_input = input("Enter Neon Connection String or Host: ").strip()
+
+# Default values
+host = ""
+database = "neondb"
+user = "neondb_owner"
+password = ""
+
+# Auto-parse if they pasted a full postgresql:// URL
+if raw_input.startswith("postgres://") or raw_input.startswith("postgresql://"):
+    try:
+        import urllib.parse as urlparse
+        result = urlparse.urlparse(raw_input)
+        host = result.hostname or ""
+        user = result.username or "neondb_owner"
+        password = result.password or ""
+        database = result.path.lstrip('/') or "neondb"
+        print("\n--> Auto-parsed full connection URI successfully!")
+    except Exception as e:
+        print(f"Error parsing URI: {e}")
+        host = raw_input
+else:
+    # If they pasted host/db?sslmode...
+    if '/' in raw_input:
+        parts = raw_input.split('/')
+        host = parts[0]
+        path_part = parts[1]
+        if '?' in path_part:
+            database = path_part.split('?')[0] or "neondb"
+        else:
+            database = path_part or "neondb"
+        print(f"\n--> Cleaned host domain name and extracted database: '{database}'")
+    else:
+        host = raw_input
+
+    # Prompt for database, user, password
+    database = input(f"Enter Neon Database Name (default: {database}): ").strip() or database
+    user = input(f"Enter Neon Username (default: {user}): ").strip() or user
+    password = input("Enter Neon Password: ").strip()
 
 print("\nConnecting to Neon PostgreSQL database...")
 try:
