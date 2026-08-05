@@ -147,6 +147,31 @@ with open(data_path, 'r', encoding='utf-8') as f:
 conn.commit()
 print(f"Data upload finished. {statement_count} statements imported.")
 
+# 2.5 Patch orphaned com_codigo values in credcom to prevent constraint violation
+print("\nScanning for orphaned com_codigo values in credcom...")
+try:
+    cursor.execute("""
+        SELECT DISTINCT com_codigo 
+        FROM credcom 
+        WHERE com_codigo NOT IN (SELECT com_cod FROM comerciales);
+    """)
+    missing_codes = [row[0] for row in cursor.fetchall()]
+    if missing_codes:
+        print(f"Found {len(missing_codes)} missing merchant codes in comerciales: {repr(missing_codes)}")
+        print("Inserting placeholder records into comerciales...")
+        for code in missing_codes:
+            cursor.execute("""
+                INSERT INTO comerciales (com_cod, catc_cod, cc_des, cc_dir, cc_tel1, cc_tel2, activo, fec_activ, fec_dactiv, cc_contac)
+                VALUES (%s, '00', 'Placeholder de Migracion', '', '', '', 'N', '1900-01-01', '1900-01-01', '');
+            """, [code])
+            print(f"  Inserted placeholder for code: '{code}'")
+        conn.commit()
+    else:
+        print("No orphaned codes found!")
+except Exception as e:
+    conn.rollback()
+    print(f"Warning: Failed to check/patch missing merchant codes: {e}")
+
 # 3. Create Foreign Key Constraints (with NOT VALID for legacy safety)
 if fkeys_sql.strip():
     print("\nApplying foreign key constraints to Neon database (with NOT VALID for safety)...")
