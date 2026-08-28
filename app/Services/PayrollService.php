@@ -17,7 +17,7 @@ class PayrollService
 {
     /**
      * Generar borradores de planillas (Fondo Fijo y Ordinaria) para un mes específico.
-     * 
+     *
      * @param string $fec_mes Fecha del primer día del mes (Y-m-d, ej: 2026-08-01).
      * @return array
      */
@@ -25,7 +25,7 @@ class PayrollService
     {
         $date = Carbon::parse($fec_mes)->startOfMonth();
         $fec_mes_clean = $date->format('Y-m-d');
-        
+
         $startOfMonth = $date->copy()->startOfMonth()->format('Y-m-d');
         $endOfMonth = $date->copy()->endOfMonth()->format('Y-m-d');
 
@@ -62,9 +62,9 @@ class PayrollService
                     $socioCuotas = $cuotasMes->get($de_codigo) ?? collect();
                     $prestamoAmortiz = (float)$socioCuotas->sum('amortiz');
                     $prestamoInteres = (float)$socioCuotas->sum('interes');
-                    
+
                     // Aporte fondo fijo del socio (cuota en tabla socios)
-                    $fondoFf = (float)$socio->cuota; 
+                    $fondoFf = (float)$socio->cuota;
                     $totalImportFf = $fondoFf + $prestamoAmortiz + $prestamoInteres;
 
                     DescFf::create([
@@ -94,10 +94,10 @@ class PayrollService
                     $asamblea = (float)($asambleasMap[$de_codigo] ?? 0.0);
                     $encargos = (float)($encargosMap[$de_codigo] ?? 0.0);
                     $cuotaSindicato = (float)($fondosMap[$de_codigo] ?? 15.0);
-                    
+
                     $tipoempl = $socio->cesante ? 2 : 1;
                     $fondoMort = (float)($otrosDsctosMap[$tipoempl] ?? 10.0);
-                    
+
                     $canasta = (float)($canaviMap[$de_codigo] ?? 0.0);
                     $salud = (float)($ayuexsaMap[$de_codigo] ?? 0.0);
                     $otros = (float)($otrosMap[$de_codigo] ?? 0.0);
@@ -145,14 +145,14 @@ class PayrollService
 
     /**
      * Confirmar planillas y aplicar los aportes/descuentos a los saldos reales de socios (Transacción Atómica).
-     * 
+     *
      * @param string $fec_mes Fecha del primer día del mes (Y-m-d).
      * @return array
      */
     public function confirm(string $fec_mes): array
     {
         $fec_mes_clean = Carbon::parse($fec_mes)->startOfMonth()->format('Y-m-d');
-        
+
         $startOfMonth = Carbon::parse($fec_mes)->startOfMonth()->format('Y-m-d');
         $endOfMonth = Carbon::parse($fec_mes)->endOfMonth()->format('Y-m-d');
 
@@ -190,7 +190,7 @@ class PayrollService
                         'actual' => 0.0,
                     ]);
                 }
-                
+
                 $nuevoActual = $consFf->actual + $p->fondo_ff;
                 $consFf->update([
                     'actual' => $nuevoActual,
@@ -222,7 +222,7 @@ class PayrollService
                         $prestamo = Prestamo::where('pre_codigo', $cuota->pre_codigo)->first();
                         if ($prestamo) {
                             $nuevoSaldo = max(0.0, $prestamo->saldo - $cuota->amortiz);
-                            
+
                             // Verificar si quedan cuotas pendientes para este préstamo
                             $cuotasPendientesRestantes = Cuota::where('pre_codigo', $cuota->pre_codigo)
                                 ->where('cancelado', 0)
