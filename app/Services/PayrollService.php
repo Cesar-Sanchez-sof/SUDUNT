@@ -17,7 +17,7 @@ class PayrollService
 {
     /**
      * Generar borradores de planillas (Fondo Fijo y Ordinaria) para un mes específico.
-     * 
+     *
      * @param string $fec_mes Fecha del primer día del mes (Y-m-d, ej: 2026-08-01).
      * @return array
      */
@@ -25,7 +25,7 @@ class PayrollService
     {
         $date = Carbon::parse($fec_mes)->startOfMonth();
         $fec_mes_clean = $date->format('Y-m-d');
-        
+
         $startOfMonth = $date->copy()->startOfMonth()->format('Y-m-d');
         $endOfMonth = $date->copy()->endOfMonth()->format('Y-m-d');
 
@@ -34,6 +34,21 @@ class PayrollService
             // 1. Eliminar borradores previos no confirmados para este mes
             DescFf::where('fec_mes', $fec_mes_clean)->where('confirmado', 0)->delete();
             DescOrd::where('fec_mes', $fec_mes_clean)->where('confirmado', 0)->delete();
+
+            // 0. Cargar todas las tablas auxiliares en memoria (Optimización N+1)
+            $cuotasMes = Cuota::where('cancelado', 0)
+                ->whereBetween('fecha', [$startOfMonth, $endOfMonth])
+                ->get()
+                ->groupBy('de_codigo');
+
+            $asambleasMap = DB::table('asamblea')->pluck('aporte', 'de_codigo')->toArray();
+            $encargosMap = DB::table('encargo')->pluck('aporte', 'de_codigo')->toArray();
+            $fondosMap = DB::table('fondo')->pluck('aporte', 'de_codigo')->toArray();
+            $canaviMap = DB::table('canavi')->pluck('aporte', 'de_codigo')->toArray();
+            $ayuexsaMap = DB::table('ayuexsa')->pluck('aporte', 'de_codigo')->toArray();
+            $otrosMap = DB::table('otros')->pluck('aporte', 'de_codigo')->toArray();
+            $fonhijoMap = DB::table('tbl_fonhijo')->pluck('aporte', 'de_codigo')->toArray();
+            $otrosDsctosMap = DB::table('otros_dsctos')->pluck('c_fonmor', 'tipoempl')->toArray();
 
             $socios = Socio::all();
             $countFf = 0;
@@ -44,17 +59,12 @@ class PayrollService
 
                 // --- 2. GENERAR PLANILLA DE FONDO FIJO (desc_ff) ---
                 if ($socio->soc_ff) {
-                    // Buscar cuotas de préstamos financieros agendadas para este mes
-                    $loanInstallments = Cuota::where('de_codigo', $de_codigo)
-                        ->where('cancelado', 0)
-                        ->whereBetween('fecha', [$startOfMonth, $endOfMonth])
-                        ->get();
+                    $socioCuotas = $cuotasMes->get($de_codigo) ?? collect();
+                    $prestamoAmortiz = (float)$socioCuotas->sum('amortiz');
+                    $prestamoInteres = (float)$socioCuotas->sum('interes');
 
-                    $prestamoAmortiz = (float)$loanInstallments->sum('amortiz');
-                    $prestamoInteres = (float)$loanInstallments->sum('interes');
-                    
                     // Aporte fondo fijo del socio (cuota en tabla socios)
-                    $fondoFf = (float)$socio->cuota; 
+                    $fondoFf = (float)$socio->cuota;
                     $totalImportFf = $fondoFf + $prestamoAmortiz + $prestamoInteres;
 
                     DescFf::create([
@@ -80,21 +90,18 @@ class PayrollService
 
                 // --- 3. GENERAR PLANILLA ORDINARIA (desc_ord) ---
                 if ($socio->sindical) {
-                    // Cargar aportes desde las tablas auxiliares/individuales
-                    $asamblea = (float)(DB::table('asamblea')->where('de_codigo', $de_codigo)->value('aporte') ?? 0.0);
-                    $encargos = (float)(DB::table('encargo')->where('de_codigo', $de_codigo)->value('aporte') ?? 0.0);
-                    
-                    // Cuota ordinaria del sindicato (desde la tabla fondo o socios)
-                    $cuotaSindicato = (float)(DB::table('fondo')->where('de_codigo', $de_codigo)->value('aporte') ?? 15.0); // Default 15
-                    
-                    // Fondo Mortuorio desde la tabla otros_dsctos o default
+                    // Cargar aportes desde los mapas en memoria
+                    $asamblea = (float)($asambleasMap[$de_codigo] ?? 0.0);
+                    $encargos = (float)($encargosMap[$de_codigo] ?? 0.0);
+                    $cuotaSindicato = (float)($fondosMap[$de_codigo] ?? 15.0);
+
                     $tipoempl = $socio->cesante ? 2 : 1;
-                    $fondoMort = (float)(DB::table('otros_dsctos')->where('tipoempl', $tipoempl)->value('c_fonmor') ?? 10.0);
-                    
-                    $canasta = (float)(DB::table('canavi')->where('de_codigo', $de_codigo)->value('aporte') ?? 0.0);
-                    $salud = (float)(DB::table('ayuexsa')->where('de_codigo', $de_codigo)->value('aporte') ?? 0.0);
-                    $otros = (float)(DB::table('otros')->where('de_codigo', $de_codigo)->value('aporte') ?? 0.0);
-                    $fondom = (float)(DB::table('tbl_fonhijo')->where('de_codigo', $de_codigo)->value('aporte') ?? 0.0);
+                    $fondoMort = (float)($otrosDsctosMap[$tipoempl] ?? 10.0);
+
+                    $canasta = (float)($canaviMap[$de_codigo] ?? 0.0);
+                    $salud = (float)($ayuexsaMap[$de_codigo] ?? 0.0);
+                    $otros = (float)($otrosMap[$de_codigo] ?? 0.0);
+                    $fondom = (float)($fonhijoMap[$de_codigo] ?? 0.0);
 
                     $totalImportOrd = $asamblea + $encargos + $cuotaSindicato + $fondoMort + $canasta + $salud + $otros + $fondom;
 
@@ -138,14 +145,14 @@ class PayrollService
 
     /**
      * Confirmar planillas y aplicar los aportes/descuentos a los saldos reales de socios (Transacción Atómica).
-     * 
+     *
      * @param string $fec_mes Fecha del primer día del mes (Y-m-d).
      * @return array
      */
     public function confirm(string $fec_mes): array
     {
         $fec_mes_clean = Carbon::parse($fec_mes)->startOfMonth()->format('Y-m-d');
-        
+
         $startOfMonth = Carbon::parse($fec_mes)->startOfMonth()->format('Y-m-d');
         $endOfMonth = Carbon::parse($fec_mes)->endOfMonth()->format('Y-m-d');
 
@@ -183,7 +190,7 @@ class PayrollService
                         'actual' => 0.0,
                     ]);
                 }
-                
+
                 $nuevoActual = $consFf->actual + $p->fondo_ff;
                 $consFf->update([
                     'actual' => $nuevoActual,
@@ -215,7 +222,7 @@ class PayrollService
                         $prestamo = Prestamo::where('pre_codigo', $cuota->pre_codigo)->first();
                         if ($prestamo) {
                             $nuevoSaldo = max(0.0, $prestamo->saldo - $cuota->amortiz);
-                            
+
                             // Verificar si quedan cuotas pendientes para este préstamo
                             $cuotasPendientesRestantes = Cuota::where('pre_codigo', $cuota->pre_codigo)
                                 ->where('cancelado', 0)
