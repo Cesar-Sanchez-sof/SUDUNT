@@ -60,7 +60,14 @@ export default function Index({ socios, filters }: Props) {
 
     const handlePageChange = (url: string | null) => {
         if (url) {
-            router.get(url, {}, { preserveState: true });
+            try {
+                // Convert absolute URL to relative path to prevent HTTP/HTTPS protocol mismatch errors
+                const parsedUrl = new URL(url);
+                const relativeUrl = parsedUrl.pathname + parsedUrl.search;
+                router.get(relativeUrl, {}, { preserveState: true });
+            } catch (e) {
+                router.get(url, {}, { preserveState: true });
+            }
         }
     };
 

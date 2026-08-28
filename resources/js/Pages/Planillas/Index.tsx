@@ -51,6 +51,10 @@ interface Props {
     resumenFf: Resumen;
     resumenOrd: Resumen;
     selectedMonth: string;
+    flash: {
+        success: string | null;
+        error: string | null;
+    };
 }
 
 type TabType = 'fondofijo' | 'ordinaria';
@@ -63,6 +67,7 @@ export default function Index({
     resumenFf,
     resumenOrd,
     selectedMonth,
+    flash,
 }: Props) {
     // Extraer año-mes para el input HTML (e.g. 2026-08-01 -> 2026-08)
     const [monthInput, setMonthInput] = useState(selectedMonth.substring(0, 7));
@@ -113,6 +118,18 @@ export default function Index({
             <div className="py-12">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     
+                    {/* Alertas de Flash (Success / Error) */}
+                    {flash?.success && (
+                        <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-semibold dark:bg-emerald-950/20 dark:border-emerald-900 dark:text-emerald-400">
+                            {flash.success}
+                        </div>
+                    )}
+                    {flash?.error && (
+                        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm font-semibold dark:bg-red-950/20 dark:border-red-900 dark:text-red-400">
+                            {flash.error}
+                        </div>
+                    )}
+
                     {/* Filtro de Mes y Acciones de Control */}
                     <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3 overflow-hidden bg-white/80 p-6 shadow-sm backdrop-blur-md sm:rounded-xl dark:bg-gray-800/80 dark:border dark:border-gray-700/50">
                         {/* Selector de Mes */}
